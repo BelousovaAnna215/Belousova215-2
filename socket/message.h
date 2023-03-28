@@ -13,20 +13,25 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 const char* buystr = "buy";
 const char* nobuystr = "nobuy";
 const char* sellstr = "sell";
 const char* nosellstr = "nosell";
+const char* exstr = "exit";
 
 #define SERVER_IPV4_ADDR "127.0.0.1"
 #define MAX_MESSAGES_SIZE 128
 #define PORT 1234
+#define SELL 4
+#define BUY 3
+#define EXIT 3
 
 
 typedef struct {
-	int socket;// дескриптор
-	struct sockaddr_in addres;// структура для подключения
+	int socket;
+	struct sockaddr_in addres;
 } peer_t;
 
 
