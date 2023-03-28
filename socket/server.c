@@ -6,17 +6,44 @@
 
 #define NO_SOCKET -1
 
+#define MODEL_LEN 16
+
 struct car
 {
 	int have;
-	char model[16];
+	char model[MODEL_LEN];
 } ;
 
 int listen_sock;//сокет сервера
 peer_t connection_list[MAX_CLIENTS];//массив подключенных клиентов
-char read_buffer[128]; // для сообщения которое ввели
+char read_buffer[MAX_MESSAGES_SIZE]; // для сообщения которое ввели
 
 void shutdown_properly();//функция закрытия сокетов
+
+void sig_handler(){
+	 //printf("Server shutdown\n");
+	 int i;
+	 for (i = 0; i < MAX_CLIENTS; i++){
+		 write(connection_list[i].socket, exstr, strlen(exstr));
+	 }
+	 shutdown_properly();
+	 exit(0);
+}
+
+void print_car(struct car *table){
+	printf("\nCAR LIST\n");
+	int i,fl = 0;
+	for (i = 0; i < MAX_CARS; i++){
+		if (table[i].have == 1){
+			fl = 1;
+			printf("car: %s", table[i].model);
+		}
+	}
+	if (fl == 0){
+		printf("Empty list\n");
+	}
+	return;
+}
 
 
 int start_listen_socket(int *listen_sock)//открытие сокетов
@@ -36,7 +63,7 @@ int start_listen_socket(int *listen_sock)//открытие сокетов
   }
   
   struct sockaddr_in my_addr;//объявление структуры
-  memset(&my_addr, 0, sizeof(my_addr));//обнуление адреса
+  memset(&my_addr, 0, sizeof(my_addr));
   my_addr.sin_family = AF_INET;
   my_addr.sin_addr.s_addr = INADDR_ANY;
   my_addr.sin_port = htons(PORT);
@@ -57,21 +84,21 @@ int start_listen_socket(int *listen_sock)//открытие сокетов
   return 0;
 }
 
-void shutdown_properly()//завершение всего
+void shutdown_properly()//завершение
 {
 	//printf("shutdown_properly\n");
 	shutdown(listen_sock, 2);
-  int i;
-  close(listen_sock);
+	int i;
+	close(listen_sock);
   
-  for (i = 0; i < MAX_CLIENTS; ++i)
-    if (connection_list[i].socket != NO_SOCKET){// закрываем все открытые сокеты
-		shutdown(connection_list[i].socket, 2);
-		close(connection_list[i].socket);
-    }
+	for (i = 0; i < MAX_CLIENTS; ++i)
+		if (connection_list[i].socket != NO_SOCKET){
+			shutdown(connection_list[i].socket, 2);
+			close(connection_list[i].socket);
+		}
     
-  printf("Shutdown server properly.\n");
-  exit(0);
+	printf("Shutdown server properly.\n");
+	exit(0);
 }
 
 int build_fd_sets(fd_set *read_fds)// строим список дескрипторов
@@ -130,6 +157,7 @@ int close_client_connection(peer_t *client)// отсоединяем клиен�
 int main(int argc, char **argv)
 {
 	//printf("begin server\n");
+	signal(SIGINT, sig_handler);
 	
 	struct car table[MAX_CARS];
 	for (int i = 0; i < MAX_CARS; i++){
@@ -150,15 +178,15 @@ int main(int argc, char **argv)
   
   fd_set read_fds;
   
-  int high_sock = listen_sock;// максимальный сокет
+  int high_sock = listen_sock;
   
   printf("Waiting for incoming connections.\n");
   
-  while (1) {// бесконечный цикл
+  while (1) {
 	  
 	  //printf("while\n");
 	  
-    build_fd_sets(&read_fds);// строим набор из клиентов по указанным параметрам
+    build_fd_sets(&read_fds);
     
    // printf("max socket %d\n",high_sock);
     
@@ -177,7 +205,7 @@ int main(int argc, char **argv)
     switch (activity) {
       case -1:
         perror("select()");
-        shutdown_properly();// закрываем дескрипторы
+        shutdown_properly();
  
       case 0:
         printf("select() returns 0.\n");
@@ -191,36 +219,39 @@ int main(int argc, char **argv)
         
         int j,count;
         for (j=0 ; j < MAX_CLIENTS; ++j){
-			if (FD_ISSET(connection_list[j].socket, &read_fds)) {// пришло сообщение от клиента вывести
+			if (FD_ISSET(connection_list[j].socket, &read_fds)) {// пришло сообщение от клиента
 				//printf("get message from client and j = %d\n", j);
 				count = read(connection_list[j].socket, read_buffer, sizeof(read_buffer)-1);
 				//printf ("count = %d\n", count);
 				if (count == 0){
-					exit(0);
+					//exit(0);
+					close_client_connection(&connection_list[j]);
+					continue;
 				}
 				read_buffer[count] = '\0';
 				//printf ("message is:\n");
-				printf ("message is: %s\n", read_buffer);
+				printf ("~message is: %s\n", read_buffer);
 				//printf ("strlen = %ld\n", strlen(read_buffer));
 				//printf ("end of message\n");
 				
 						
-				if (strncmp(read_buffer, "buy", 3) == 0){
-					printf("want to buy car\n");
+				if (strncmp(read_buffer, "buy", BUY) == 0){
+					printf("*Client wants to buy car\n");
+					print_car(table);
 					int fl = 0;
 					for (int i = 0; i < MAX_CARS; i++){
-						if (strcmp(read_buffer+4, table[i].model) == 0 && table[i].have == 1){
-							printf("model of car: %s\n", table[i].model);
+						if (strcmp(read_buffer + (BUY + 1), table[i].model) == 0 && table[i].have == 1){
+							printf("*model of car: %s\n", table[i].model);
 							table[i].have = 0;
-							printf("Car was bought\n");
+							//printf("Car was bought\n");
 							fl = 1;
 							break;
 						}
 					}
 					if (fl == 1){
-							printf("ALL Car was bought\n");
+							printf("MESSAGE FOR EVERYONE: Car was bought\n");
 							int k;
-							for (k=0 ; k < MAX_CLIENTS; ++k){
+							for (k = 0 ; k < MAX_CLIENTS; ++k){
 								if (connection_list[k].socket != NO_SOCKET){
 									write(connection_list[k].socket, buystr, strlen(buystr));
 								}
@@ -230,30 +261,31 @@ int main(int argc, char **argv)
 						//отправить что ошибка
 						write(connection_list[j].socket, nobuystr, strlen(nobuystr));
 					}
-				} else if (strncmp(read_buffer, "sell", 4) == 0 ){
-					printf("want to sell car\n");
+				} else if (strncmp(read_buffer, "sell", SELL) == 0 ){
+					printf("*Client wants to sell car\n");
+					print_car(table);
 					int fl = 0;
 					int i;
 					for (i = 0; i < MAX_CARS; i++){
 						if (table[i].have == 0){
 							table[i].have = 1;
-							strncpy(table[i].model, read_buffer+5, 16);
-							printf("model of car: %s\n",table[i].model );
-							printf("Car was selling\n");
+							strncpy(table[i].model, read_buffer + (SELL + 1), MODEL_LEN);
+							printf("*model of car: %s\n",table[i].model );
+							//printf("Car sold\n");
 							fl = 1;
 							break;
 						}
 					}
 					if (fl == 1){
-							printf("ALL Car was sell\n");
+							printf("MESSAGE FOR EVERYONE: Car sold\n");
 							int k;
-							for (k=0 ; k < MAX_CLIENTS; ++k){
+							for (k = 0 ; k < MAX_CLIENTS; ++k){
 								if (connection_list[k].socket != NO_SOCKET){
 									write(connection_list[k].socket, sellstr, strlen(sellstr));
 								}
 							}
 					} else {
-						printf("no free space\n");			
+						printf("No free space\n");			
 						//отправить что ошибка
 						write(connection_list[j].socket, nosellstr, strlen(nosellstr));
 					}
@@ -269,3 +301,4 @@ int main(int argc, char **argv)
  
   return 0;
 }
+
