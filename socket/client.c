@@ -15,16 +15,16 @@ int connect_server(peer_t *server)//создаем сокет
     return -1;
   }
   
-  // set up addres настройка параметров
+  // настройка адреса
   struct sockaddr_in server_addr;
-  memset(&server_addr, 0, sizeof(server_addr));// обнуление
+  memset(&server_addr, 0, sizeof(server_addr));
   server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
   server_addr.sin_port = htons(PORT);
   
-  server->addres = server_addr;// заполнили структуру
+  server->addres = server_addr;
   
-  if (connect(server->socket, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {// just connect
+  if (connect(server->socket, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {
     perror("connect()");
     return -1;
   }
@@ -46,7 +46,7 @@ int build_fd_sets(peer_t *server, fd_set *read_fds)//организация де
 
 void shutdown_properly()// завершение
 {
-  printf("shutdown\n");
+  printf("Client finished work\n");
   close(server.socket);
   exit(0);
 }
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 
   fd_set read_fds;
   
-  printf("Waiting for server message or stdin input. Please, type text to send:\n");
+  printf("Please, type text to send:\n");
   
   int maxfd = server.socket;
   
@@ -89,12 +89,12 @@ int main(int argc, char **argv)
             
 			int count = read(STDIN_FILENO, read_buffer, sizeof(read_buffer)-1);
 			read_buffer[count]= '\0';
-			printf("message is %s\n",read_buffer);
-			if (strncmp(read_buffer, "exit", 4) == 0 ){
+			printf("~message is %s\n",read_buffer);
+			if (strncmp(read_buffer, "exit", EXIT) == 0 ){
 				shutdown_properly();
 			}
 			
-			if (strncmp(read_buffer, "buy", 3) == 0 || strncmp(read_buffer, "sell", 4) == 0){
+			if (strncmp(read_buffer, "buy", BUY) == 0 || strncmp(read_buffer, "sell", SELL) == 0){
 				write(server.socket, read_buffer, strlen(read_buffer)); // теперь нужно его отправить
 			} else {
 				printf("wrong message\n");
@@ -110,24 +110,24 @@ int main(int argc, char **argv)
 			}
 			read_buffer[count] ='\0';
 			if (strcmp(read_buffer, buystr) == 0){
-				printf("this car was bought\n");
+				printf("This car was bought\n");
 			} else if (strcmp(read_buffer, sellstr) == 0){
-				printf("we have new car\n");
+				printf("We have new car\n");
 			} else if (strcmp(read_buffer, nobuystr) == 0){
-				printf("we have not got this car\n");
+				printf("We have not got this car\n");
 			} else if (strcmp(read_buffer, nosellstr) == 0){
-				printf("no empty space\n");
+				printf("No empty space\n");
 			} else {
-				printf("message is : %s\n",read_buffer);
+				printf("~message is : %s\n",read_buffer);
 			}
 			//printf("%s\n",read_buffer);
-			//if (strcmp(read_buffer,endstr) == 0){
-			//	shutdown_properly();
-			//}
+			if (strcmp(read_buffer,exstr) == 0){
+				shutdown_properly();
+			}
         }
 
     }
-    printf("message: \n");
+    //printf("message: \n");
     //printf("And we are still waiting for server or stdin activity. You can type something to send:\n");
   }
   
