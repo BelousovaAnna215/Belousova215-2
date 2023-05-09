@@ -342,6 +342,10 @@ int main(){
             break;
             
          case 1000:
+			listCow.clear();
+			listGoat.clear();
+			listSheep.clear();
+			listCon.clear();
             exit(0);
             
          default:
@@ -350,4 +354,3 @@ int main(){
       }
 	};
 }
-
