@@ -28,6 +28,7 @@ enum type_of_lex {// набор именованных констант
 };
 
 /////////////////////////  Класс Lex  //////////////////////////
+
 struct int_string{
     int           v_lex; //число
     string		  v_slex = ""; //строка
@@ -179,7 +180,7 @@ const char *
 Scanner::TD    [] = { "@", ";", ",", ":", "=", "(", ")", "==", "<", ">", "+", "-", "*", "/", "<=", "!=", ">=", NULL };
 
 Lex Scanner::get_lex () {
-    enum    state { H, IDENT, NUMB, COM, ALE, NEQ, STRG };// начало символ цифра (/*) (= < >) (!)
+    enum    state { H, IDENT, NUMB, COM, ALE, NEQ, STRG };// начало символ цифра (/*) (= < >) (!) строка
     int     d, j;
     string strg; // полученная строка
     string  buf; // полученная лексема
@@ -196,7 +197,7 @@ Lex Scanner::get_lex () {
                     }
                     
                     else if ( c == '"' ) {
-						//strg.push_back (c);
+						//strg.push_back (c); 
                         CS  = STRG;
                     }
                     
@@ -357,7 +358,7 @@ ostream & operator<< ( ostream &s, Lex l ) {
         t = "id_str";
        
     else
-        throw l;// исключение
+        throw l;
     s << '(' << t << ',' << l.v_lex << ',' << l.v_slex << ");"  << endl;
     return s;
 }
@@ -378,12 +379,13 @@ class Parser {
     type_of_lex  c_type; 
     int          c_val;
     string 		 c_sval;
+    
+    bool flag = 0; // 0 - int 1 - string
 
     Scanner      scan; 
 
     stack < int >           st_int;
     stack < type_of_lex >   st_lex;
-//    stack < string >  		st_str;
 
     void  P();
     void  D1();
@@ -409,6 +411,7 @@ class Parser {
     void  eq_type ();
     void  eq_bool ();
     void  check_id_in_read ();
+    
     void  gl () {
         curr_lex  = scan.get_lex ();// получаем одну лексему
         //cout<<curr_lex;
@@ -424,8 +427,6 @@ public:
     
 };
 
-bool flag = 0; // 0 - int 1 - string
-
 void Parser::analyze () {
 	cout<<"analyze"<<endl;
     gl ();
@@ -433,7 +434,7 @@ void Parser::analyze () {
     cout<<"\n\nПОЛИЗ\n";
     for ( Lex l : poliz )
         cout << l;
-    cout << endl << "Yes!!!" << endl;// вывод полученного полиза
+    cout << endl << "Yes!!!" << endl;
 }
 
 // P
@@ -441,12 +442,11 @@ void Parser::analyze () {
 void Parser::P () {
 	//cout<<"P"<<endl;
     if ( c_type == LEX_PROGRAM ) {
-		//cout<<"c_type == LEX_PROGRAM"<<endl;
         gl ();
     }
     else
         throw curr_lex;
-    if ( c_type == LEX_BEGIN ) {//{
+    if ( c_type == LEX_BEGIN ) { //{
 		gl();
 		D1 ();
 		B1 ();
@@ -454,12 +454,12 @@ void Parser::P () {
 	else 
 		throw curr_lex;
 		
-	if ( c_type != LEX_END ) {//} 
+	if ( c_type != LEX_END ) { //} 
 		throw curr_lex;
 	}
 	gl();
 		
-    if ( c_type != LEX_FIN ) {//@
+    if ( c_type != LEX_FIN ) { //@
 		throw curr_lex;
 	} else {
 		cout<<"успешно"<<endl;
@@ -490,7 +490,6 @@ void Parser::D1 () {
 // D  〈описание〉 → 〈тип〉T 〈переменная〉S {{ , 〈переменная〉S }}
 void Parser::D (type_of_lex type_Lex) {
 	//cout<<"D"<<endl;
-	//T();
 	gl();
 	if ( c_type != LEX_ID ) {
 		throw curr_lex;
@@ -498,60 +497,26 @@ void Parser::D (type_of_lex type_Lex) {
 	else {
 		S(type_Lex);
 		while ( c_type == LEX_COMMA ) {
-			//cout<<" c_type == LEX_COMMA"<<endl;
             gl ();
             S(type_Lex);
         }
-        //проверка на ; 
-        if (c_type != LEX_SEMICOLON){
+        if (c_type != LEX_SEMICOLON){ //;
 			throw curr_lex;
 		}
-		dec(type_Lex);// записываем информацию в TID
+		dec(type_Lex); // записываем информацию в TID
 	}
 }
 
-
-// T +
-// T  〈тип〉 → int | string | bool
-/*void Parser::T () {
-	cout<<"T"<<endl;
-	//gl();
-	if ( c_type == LEX_INT ) {
-		gl ();
-		//dec ( LEX_INT );
-		//gl ();
-	}
-	else
-		if ( c_type == LEX_BOOL ) {
-			gl ();
-			//dec ( LEX_BOOL );
-			//gl ();
-		}
-		else
-			if ( c_type == LEX_BOOL ) {
-				//dec ( LEX_BOOL );
-				gl ();
-			}
-			else
-				throw curr_lex;
-}*/
 
 // S
 // S  〈переменная〉 → 〈идентификатор〉ID | 〈идентификатор〉ID = 〈константа〉C
 void Parser::S (type_of_lex type_Lex) {
 	//cout<<"S"<<endl;
-	//if (type_Lex == LEX_STRING ){
-		//st_str.push ( c_sval);// ?????
-		//cout<<"c_sval = "<<c_sval<<endl;
-	//} else {
-		st_int.push ( c_val );
-		//cout<<"c_val = "<<c_val<<endl;
-	//}
-		
+	st_int.push ( c_val );	
 	gl();
     if ( c_type == LEX_ASSIGN ) {
 		gl();
-		C();// присвоить значение
+		C(); // занести значение в таблицу
 	}
 }
 
@@ -578,28 +543,12 @@ void Parser::C () {
 // B1  〈операторы〉 → {{ 〈оператор〉B; }}
 void Parser::B1 () {
 	//cout<<"B1"<<endl;
-	flag = 0;
-	//B ();
 	while ( c_type != LEX_END) {
-		//cout<<"B1"<<endl;
 		flag = 0;
-		//gl ();
 		B ();
 		gl();
 	}
 }
-
-/*void Parser::B1 () {
-	//cout<<"B1"<<endl;
-	flag = 0;
-	B ();
-	while ( c_type == LEX_SEMICOLON or c_type == LEX_END) {
-		//cout<<"B1"<<endl;
-		flag = 0;
-		gl ();
-		B ();
-	}
-}*/
 
 // B
 // B  〈оператор〉 → if (〈выражение〉W) 〈оператор〉B else 〈оператор〉B | while (〈выражение〉W) 〈оператор〉B | read (〈идентификатор〉ID); |
@@ -612,7 +561,7 @@ void Parser::B () {
     if ( c_type == LEX_IF ) {
 		//cout<<"if"<<endl;
 		gl ();
-        W1 (); // может быть выражение в скобках
+        W1 (); 
         eq_bool ();
         pl2 = poliz.size();
         poliz.push_back ( Lex() );
@@ -715,85 +664,35 @@ void Parser::B () {
 			B1();
 			if ( c_type != LEX_END ) {
 				throw curr_lex;
-				//cout<<"конец составного оператора"<<endl;
-				//gl();
 			}
         }//составной оператор
-        
-        //else if ( c_type == LEX_END ) {
-			//cout<<"end"<<endl;
-			//gl();
-        //}//end 
-        
-        //else if ( c_type == LEX_FIN ) {
-			//cout<<"fin"<<endl;
-        //}//finish
-
-        /*else{ // иначе оператор выражение
-			cout<<"else"<<endl;
-            W();
-		}*/
 		
-		else{ // оператор выражение
+		else{
 			//cout<<"оператор выражение"<<endl;
             if ( c_type == LEX_ID ) {
-				//cout<<"LEX_ID"<<endl;
-				//cout<< TID[c_val].get_declare() <<endl;
 				check_id ();
 				poliz.push_back (Lex ( POLIZ_ADDRESS, c_val ) );
 				gl();
 				if ( c_type == LEX_ASSIGN ) {
 					gl ();
 					W1();
-					//B ();
 					eq_type ();
 					if (flag == 0){
 						poliz.push_back ( Lex ( LEX_ASSIGN ) );
 					}
 					else
 						poliz.push_back ( Lex ( LEX_SASSIGN ) );
-					//poliz.push_back ( Lex ( LEX_ASSIGN ) );
 				}
 				else
 					throw curr_lex;
 			} else {
 				throw curr_lex;
 			}
-			if ( c_type != LEX_SEMICOLON ){ //  в W1 не должно проверяться на точку с запятой
+			if ( c_type != LEX_SEMICOLON ){
 				throw curr_lex;
 			}
-			//gl();
 		}
 }
-
-// W
-// W  <выражение> -> ID = W1 | W1
-/*void Parser::W () {
-	//cout<<"W"<<endl;
-    if ( c_type == LEX_ID ) {
-		//cout<<"LEX_ID"<<endl;
-		//cout<< TID[c_val].get_declare() <<endl;
-		check_id ();
-		//cout<<"check_id"<<endl;
-		poliz.push_back (Lex ( POLIZ_ADDRESS, c_val ) );
-		gl();
-		if ( c_type == LEX_ASSIGN ) {
-			gl ();
-			W1 ();
-			eq_type ();
-			if (flag == 0){
-				poliz.push_back ( Lex ( LEX_ASSIGN ) );
-			}
-			else
-				poliz.push_back ( Lex ( LEX_SASSIGN ) );
-			//poliz.push_back ( Lex ( LEX_ASSIGN ) );
-		}
-		else
-			throw curr_lex;
-        } else {
-			W1();
-		}
-}*/
 
 // W1 -> W2 {{[or] W2}}
 void Parser::W1 () {
@@ -826,9 +725,7 @@ void Parser::W3 () {
 	//cout<<"W3"<<endl;
     W4 ();
     if ( c_type == LEX_EQ  || c_type == LEX_LSS || c_type == LEX_GTR ||
-         c_type == LEX_LEQ || c_type == LEX_GEQ || c_type == LEX_NEQ 
-         // || c_type == LEX_SEQ  || c_type == LEX_SLSS || c_type == LEX_SGTR || c_type == LEX_SNEQ
-         ) {
+         c_type == LEX_LEQ || c_type == LEX_GEQ || c_type == LEX_NEQ ) {
         st_lex.push ( c_type );
         gl ();
         W4 ();
@@ -854,7 +751,6 @@ void Parser::W5 () {
 	//cout<<"W5"<<endl;
     W6 ();
     while ( c_type == LEX_TIMES || c_type == LEX_SLASH ) {
-		//cout<<"c_type = "<<c_type<<endl;
         st_lex.push ( c_type );
         gl ();
         W6 ();
@@ -924,7 +820,6 @@ void Parser::W6 () {
 void Parser::dec ( type_of_lex type ) {
 	//cout<<"dec"<<endl;
     int i;
-    //cout<<"st_int = "<<st_int.size()<<endl;
     while ( !st_int.empty () ) {
         from_st ( st_int, i );
         if ( TID[i].get_declare () )
@@ -977,7 +872,6 @@ void Parser::check_op () {
         st_lex.push (r);
     else
         throw "wrong types are in operation";
-    //poliz.push_back (Lex (op) );
     
     if (flag == 1) {
 		if (op == LEX_PLUS){
@@ -998,55 +892,6 @@ void Parser::check_op () {
 	} else{
 		poliz.push_back (Lex (op) );
 	}
-	//cout<<"(Lex (op) ) = "<<op<<endl;
-    
-    
-    /*type_of_lex t1, t2, op, t = LEX_INT, r = LEX_BOOL;
-
-    from_st ( st_lex, t2 );
-    from_st ( st_lex, op );
-    from_st ( st_lex, t1 );
-    
-
-    if ( op == LEX_PLUS || op == LEX_MINUS || op == LEX_TIMES || op == LEX_SLASH )
-        r = LEX_INT;
-    if ( op == LEX_PLUS && t1 == LEX_STRING &&  t2 == LEX_STRING) {////////////////////////////////
-        r = LEX_STRING;
-        t = LEX_STRING;
-    }
-    if ( (op == LEX_EQ || c_type == LEX_LSS || c_type == LEX_GTR || c_type == LEX_NEQ) && t1 == LEX_STRING && t2 == LEX_STRING ){
-		//cout<<"here"<<endl;
-		r = LEX_STRING;
-        t = LEX_STRING;
-	}
-    if ( op == LEX_OR || op == LEX_AND )
-        t = LEX_BOOL;
-        
-    //cout<<t1<<" "<<t2<<" "<<t<<" "<<op<<endl;
-    if ( t1 == t2  &&  t1 == t )
-        st_lex.push (r);
-    else
-        throw "wrong types are in operation";
-
-    if (flag == 1) {
-		//poliz.pop_back (Lex (op) );
-		if (op == LEX_PLUS){
-			poliz.push_back (Lex (LEX_SPLUS) );
-		}
-		else if (op == LEX_EQ){
-			poliz.push_back (Lex (LEX_SEQ) );
-		}
-		else if (op == LEX_LSS){
-			poliz.push_back (Lex (LEX_SLSS) );
-		}
-		else if (op == LEX_GTR){
-			poliz.push_back (Lex (LEX_SGTR) );
-		}
-		else if (op == LEX_NEQ){
-			poliz.push_back (Lex (LEX_SNEQ) );
-		}
-	} else
-		poliz.push_back (Lex (op) );*/
 }
 
 void Parser::check_not () {
@@ -1062,7 +907,7 @@ void Parser::eq_type () {
     type_of_lex t;
     from_st ( st_lex, t );
     if ( t != st_lex.top () )
-        throw "wrong types are in :=";
+        throw "wrong types are in =";
     st_lex.pop();
 }
 
@@ -1087,14 +932,16 @@ class Executer { // исполнитель
 public:
     void execute ( vector<Lex> & poliz );
 };
+
 struct st_arg{
+	
 	stack < int_string > args;
 	void push(int iv){
 		args.push({iv,"",true});
-		}
+	}
 	void push(string sv){
 		args.push({0,sv,false});
-		}
+	}
 	int_string top_pop(){
 		int_string v = args.top();
 		args.pop();
@@ -1111,9 +958,7 @@ struct st_arg{
 };
  
 void Executer::execute ( vector<Lex> & poliz ) {
-    Lex pc_el;
-    //stack < int > args;
-    //stack < string > strargs; 
+    Lex pc_el; 
     st_arg args;
     
     string u, v;
@@ -1140,7 +985,6 @@ void Executer::execute ( vector<Lex> & poliz ) {
             case LEX_ID:
 				//cout<<"LEX_ID"<<endl;
                 i = pc_el.get_value ();
-                //cout<<"LEX_ID: i = "<<i<<endl;
                 if ( TID[i].get_assign () ) {
                   args.push ( TID[i].get_value () );
                   break;
@@ -1150,10 +994,7 @@ void Executer::execute ( vector<Lex> & poliz ) {
                   
             case LEX_SID:
 				//cout<<"LEX_SID"<<endl;
-				//cout<<pc_el<<endl;
                 i = pc_el.get_value ();
-                //i = 3;
-                //cout<<"LEX_SID: i = "<<i<<endl;
                 if ( TID[i].get_assign () ) {
                   args.push ( TID[i].get_svalue () );
                   break;
@@ -1163,7 +1004,6 @@ void Executer::execute ( vector<Lex> & poliz ) {
  
             case LEX_NOT:
 				//cout<<"LEX_NOT"<<endl;
-				//i = args.top_pop().v_lex;
                 from_st ( args, i );
                 args.push( !i );
                 break;
@@ -1203,7 +1043,6 @@ void Executer::execute ( vector<Lex> & poliz ) {
             
             case LEX_SWRITE:
                 //cout<<"LEX_SWRITE"<<endl;
-                //from_st ( strargs, u );
                 u = args.top_pop().v_slex;
                 cout << u << endl;
                 break;
@@ -1252,9 +1091,7 @@ void Executer::execute ( vector<Lex> & poliz ) {
                 
             case LEX_SPLUS:
                 //cout<<"LEX_SPLUS"<<endl;
-                //from_st ( strargs, u );
                 u = args.top_pop().v_slex;
-                //from_st ( strargs, v );
                 v = args.top_pop().v_slex;
                 args.push ( v + u );
                 break;
@@ -1293,9 +1130,7 @@ void Executer::execute ( vector<Lex> & poliz ) {
                 
             case LEX_SEQ:
                 //cout<<"LEX_SEQ"<<endl;
-                //from_st ( strargs, v );
                 u = args.top_pop().v_slex;
-                //from_st ( strargs, u );
                 v = args.top_pop().v_slex;
                 args.push ( v == u );
                 break;
@@ -1309,10 +1144,8 @@ void Executer::execute ( vector<Lex> & poliz ) {
                 
             case LEX_SLSS:
                 //cout<<"LEX_SLSS"<<endl;
-                //from_st ( strargs, u );
                 u = args.top_pop().v_slex;
                 v = args.top_pop().v_slex;
-                //from_st ( strargs, v );
                 args.push ( v < u );
                 break;
  
@@ -1325,10 +1158,8 @@ void Executer::execute ( vector<Lex> & poliz ) {
                
             case LEX_SGTR:
                 //cout<<"LEX_SGTR"<<endl;
-                //from_st ( strargs, v );
                 u = args.top_pop().v_slex;
                 v = args.top_pop().v_slex;
-                //from_st ( strargs, u );
                 args.push ( v > u );
                 break;
  
@@ -1348,16 +1179,16 @@ void Executer::execute ( vector<Lex> & poliz ) {
  
             case LEX_NEQ:
                 //cout<<"LEX_NEQ"<<endl;
-                u = args.top_pop().v_slex;
-                v = args.top_pop().v_slex;
-                args.push ( v != u );
+                from_st ( args, i );
+                from_st ( args, j );
+                args.push ( j != i );
                 break;
                 
             case LEX_SNEQ:
                 //cout<<"LEX_SNEQ"<<endl;
-                //from_st ( args, i );
-                //from_st ( args, j );
-                args.push ( j != i );
+                u = args.top_pop().v_slex;
+                v = args.top_pop().v_slex;
+                args.push ( v != u );
                 break;
                 
  
@@ -1371,9 +1202,8 @@ void Executer::execute ( vector<Lex> & poliz ) {
                 
             case LEX_SASSIGN:
                 //cout<<"LEX_SASSIGN"<<endl;
-                //from_st ( strargs, u );
                 u = args.top_pop().v_slex;
-                from_st ( args, j );///////////////
+                from_st ( args, j );
                 TID[j].put_svalue (u);
                 TID[j].put_assign (); 
                 break;
@@ -1409,7 +1239,7 @@ void Interpretator::interpretation () {
 int main () {
 	cout<< " Start!"<<endl;
     try {
-        Interpretator I ( "n3.txt" );
+        Interpretator I ( "ex1.txt" );
         I.interpretation ();
         return 0;
     }
